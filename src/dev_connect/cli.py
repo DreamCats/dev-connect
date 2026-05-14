@@ -43,7 +43,23 @@ def main(ctx: click.Context, json_output: bool, verbose: bool) -> None:
       dev grep "def main" ~/projects # 搜索代码（优先 rg，降级 grep）
       dev grep "TODO" -g "*.py"      # 只搜 Python 文件
       dev find "*.py" ~/projects     # 按名称搜索文件
+      dev head ~/config.py           # 看文件开头
       dev tail ~/logs/app.log        # 看日志末尾
+
+    \b
+    比较：
+      dev diff ~/old.py ~/new.py              # 比较两个远程文件
+      dev diff ~/remote.py ./local.py --local # 比较远程和本地
+
+    \b
+    写入/编辑：
+      dev write ~/test.txt -c "hello"        # 写入文件
+      echo "data" | dev write ~/test.txt     # 从 stdin 写入
+      dev write ~/log.txt -c "new" --append  # 追加内容
+      dev edit replace ~/f.py "old" "new"    # 替换内容
+      dev edit insert ~/f.py 10 "line"       # 在第 10 行前插入
+      dev edit delete ~/f.py 5               # 删除第 5 行
+      dev edit line ~/f.py 5 "new content"   # 修改第 5 行
 
     \b
     指定主机：
@@ -197,14 +213,199 @@ def find(
 @click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
 @click.option("--lines", "-n", default=20, help="显示行数")
 @click.pass_context
-def tail(
-    ctx: click.Context, file: str, host_alias: str | None, lines: int
-) -> None:
+def head(ctx: click.Context, file: str, host_alias: str | None, lines: int) -> None:
+    """查看文件开头内容."""
+    from dev_connect.commands.head import show_head
+
+    json_output = ctx.obj.get("json_output", False)
+    show_head(_normalize_path(file), host_alias, lines, json_output)
+
+
+@main.command()
+@click.argument("file")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.option("--lines", "-n", default=20, help="显示行数")
+@click.pass_context
+def tail(ctx: click.Context, file: str, host_alias: str | None, lines: int) -> None:
     """查看文件末尾内容."""
     from dev_connect.commands.tail import show_tail
 
     json_output = ctx.obj.get("json_output", False)
     show_tail(_normalize_path(file), host_alias, lines, json_output)
+
+
+@main.command()
+@click.argument("path")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.option("--content", "-c", help="文件内容，不指定则从 stdin 读取")
+@click.option("--append", "-a", is_flag=True, help="追加模式")
+@click.pass_context
+def write(
+    ctx: click.Context,
+    path: str,
+    host_alias: str | None,
+    content: str | None,
+    append: bool,
+) -> None:
+    """写入文件内容到远程主机.
+
+    \b
+    示例：
+      dev write ~/test.txt --content "hello"
+      dev write ~/test.txt -c "line1\nline2"
+      echo "content" | dev write ~/test.txt
+      dev write ~/log.txt -c "new log" --append
+    """
+    from dev_connect.commands.write import write_file
+
+    write_file(_normalize_path(path), content, host_alias, append)
+
+
+@main.command()
+@click.argument("file1")
+@click.argument("file2")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.option("--local", "-l", "is_local", is_flag=True, help="比较远程文件和本地文件")
+@click.pass_context
+def diff(
+    ctx: click.Context,
+    file1: str,
+    file2: str,
+    host_alias: str | None,
+    is_local: bool,
+) -> None:
+    """比较文件差异.
+
+    \b
+    示例：
+      dev diff ~/old.py ~/new.py                # 比较两个远程文件
+      dev diff ~/remote.py ./local.py --local   # 比较远程和本地文件
+      dev --json diff ~/old.py ~/new.py         # JSON 输出
+    """
+    from dev_connect.commands.diff import diff_files, diff_with_local
+
+    json_output = ctx.obj.get("json_output", False)
+
+    if is_local:
+        diff_with_local(_normalize_path(file1), file2, host_alias, json_output)
+    else:
+        diff_files(
+            _normalize_path(file1),
+            _normalize_path(file2),
+            host_alias,
+            3,
+            json_output,
+        )
+
+
+@main.group()
+@click.pass_context
+def edit(ctx: click.Context) -> None:
+    """精确编辑远程文件."""
+    pass
+
+
+@edit.command()
+@click.argument("path")
+@click.argument("old")
+@click.argument("new")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.option("--all", "-a", "all_occurrences", is_flag=True, help="替换所有匹配")
+@click.pass_context
+def replace(
+    ctx: click.Context,
+    path: str,
+    old: str,
+    new: str,
+    host_alias: str | None,
+    all_occurrences: bool,
+) -> None:
+    """替换文件内容.
+
+    \b
+    示例：
+      dev edit replace ~/config.py "old_value" "new_value"
+      dev edit replace ~/config.py "foo" "bar" --all
+    """
+    from dev_connect.commands.edit import replace_content
+
+    replace_content(_normalize_path(path), old, new, host_alias, all_occurrences)
+
+
+@edit.command()
+@click.argument("path")
+@click.argument("line", type=int)
+@click.argument("content")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.option("--after", is_flag=True, help="在行后插入（默认在行前）")
+@click.pass_context
+def insert(
+    ctx: click.Context,
+    path: str,
+    line: int,
+    content: str,
+    host_alias: str | None,
+    after: bool,
+) -> None:
+    """在指定行插入内容.
+
+    \b
+    示例：
+      dev edit insert ~/test.py 10 "new line"
+      dev edit insert ~/test.py 10 "after line" --after
+    """
+    from dev_connect.commands.edit import insert_lines
+
+    insert_lines(_normalize_path(path), line, content, host_alias, after)
+
+
+@edit.command()
+@click.argument("path")
+@click.argument("start", type=int)
+@click.argument("end", type=int, required=False)
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def delete(
+    ctx: click.Context,
+    path: str,
+    start: int,
+    end: int | None,
+    host_alias: str | None,
+) -> None:
+    """删除指定行.
+
+    \b
+    示例：
+      dev edit delete ~/test.py 10        # 删除第 10 行
+      dev edit delete ~/test.py 10 20     # 删除第 10-20 行
+    """
+    from dev_connect.commands.edit import delete_lines
+
+    delete_lines(_normalize_path(path), start, end, host_alias)
+
+
+@edit.command("line")
+@click.argument("path")
+@click.argument("num", type=int)
+@click.argument("content")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def update_line(
+    ctx: click.Context,
+    path: str,
+    num: int,
+    content: str,
+    host_alias: str | None,
+) -> None:
+    """修改指定行内容.
+
+    \b
+    示例：
+      dev edit line ~/test.py 5 "new content for line 5"
+    """
+    from dev_connect.commands.edit import update_line
+
+    update_line(_normalize_path(path), num, content, host_alias)
 
 
 @main.group()

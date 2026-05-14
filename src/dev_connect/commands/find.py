@@ -48,10 +48,12 @@ def _output_json(output: str, name: str, path: str) -> None:
         if not line:
             continue
 
-        files.append({
-            "path": line,
-            "name": line.split("/")[-1],
-        })
+        files.append(
+            {
+                "path": line,
+                "name": line.split("/")[-1],
+            }
+        )
 
     result = {
         "name": name,

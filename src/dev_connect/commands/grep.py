@@ -79,17 +79,21 @@ def _output_json(output: str, pattern: str, path: str, use_rg: bool) -> None:
         # 解析 file:line:content 格式
         parts = line.split(":", 2)
         if len(parts) >= 3:
-            matches.append({
-                "file": parts[0],
-                "line": int(parts[1]) if parts[1].isdigit() else parts[1],
-                "content": parts[2],
-            })
+            matches.append(
+                {
+                    "file": parts[0],
+                    "line": int(parts[1]) if parts[1].isdigit() else parts[1],
+                    "content": parts[2],
+                }
+            )
         else:
-            matches.append({
-                "file": "",
-                "line": 0,
-                "content": line,
-            })
+            matches.append(
+                {
+                    "file": "",
+                    "line": 0,
+                    "content": line,
+                }
+            )
 
     result = {
         "pattern": pattern,

@@ -18,13 +18,21 @@ SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 # 进入项目目录
 cd "$SCRIPT_DIR"
 
-# 安装依赖
-echo "安装依赖..."
-uv sync
+# 清理旧构建
+echo "清理旧构建..."
+rm -rf dist build
+
+# 构建 wheel
+echo "构建 wheel..."
+uv build --wheel
+
+# 卸载旧版本
+echo "卸载旧版本..."
+uv tool uninstall dev-connect 2>/dev/null || true
 
 # 全局安装
 echo "全局安装 dev 命令..."
-uv tool install .
+uv tool install dist/*.whl
 
 echo ""
 echo "安装完成！"

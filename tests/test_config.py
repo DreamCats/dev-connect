@@ -1,6 +1,5 @@
 """配置管理测试."""
 
-
 import pytest
 
 from dev_connect.common.config import get_host, load, save
