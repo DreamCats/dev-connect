@@ -146,6 +146,71 @@ dev tail FILE [--host HOST] [--lines N]
 
 - 示例：`dev tail ~/logs/app.log -n 100`
 
+## 远程 agent 会话
+
+本地 Codex App 作为 supervisor 控制远程 Claude Code / Codex 时，先阅读
+`references/agent-supervisor-workflow.md`。
+
+### 启动会话
+
+```bash
+dev agent start TASK --cwd REMOTE_DIR [--agent AGENT] [--message MSG] [--prompt-file FILE] [--wait N] [--host HOST]
+```
+
+- 底层使用远程 `tmux` 启动交互式 agent
+- `--agent claude` 会优先启动远程 `cc`，不存在时降级为 `claude`
+- `--agent cc` 会直接启动远程 `cc`，适合复用带权限参数的 Claude alias
+- `--agent codex` 会启动远程 `codex`
+- 状态记录在远程 `~/.dev-connect/agents/<TASK>/session.json`
+
+### 发送指令
+
+```bash
+dev agent send TASK [MESSAGE] [--wait N] [--lines N] [--chars N] [--compact] [--host HOST]
+```
+
+不传 `MESSAGE` 时从 stdin 读取；stdin 为空时只发送 Enter。
+
+### 读取输出
+
+```bash
+dev agent tail TASK [--lines N] [--chars N] [--compact] [--host HOST]
+```
+
+### 打断会话
+
+```bash
+dev agent interrupt TASK [--host HOST]
+```
+
+### 查看状态
+
+```bash
+dev agent status TASK [--preview-lines N] [--preview-chars N] [--host HOST]
+```
+
+### 查看 diff
+
+```bash
+dev agent diff TASK [--stat] [--name-only] [--file PATH] [--max-chars N] [--full] [--host HOST]
+```
+
+基于状态文件中的 `cwd` 执行远程 `git diff`，默认限制输出字符数。
+
+### 列出会话
+
+```bash
+dev agent list [--host HOST]
+```
+
+### 停止会话
+
+```bash
+dev agent stop TASK [--purge] [--host HOST]
+```
+
+默认只停止 tmux session；`--purge` 会删除远程状态目录。
+
 ## 配置管理
 
 ```bash

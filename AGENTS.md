@@ -22,7 +22,8 @@ src/dev_connect/
 │   ├── tree.py         # 目录树
 │   ├── grep.py         # 搜索代码（优先 rg，降级 grep）
 │   ├── find.py         # 搜索文件
-│   └── tail.py         # 看文件末尾
+│   ├── tail.py         # 看文件末尾
+│   └── agent.py        # 远程 tmux + agent 会话控制
 └── models.py           # 共享数据模型（AppConfig, HostConfig）
 ```
 
@@ -50,6 +51,14 @@ dev tree [PATH] [--host HOST] [--depth D] [--json]
 dev grep PATTERN [PATH] [--host HOST] [--include GLOB] [--json]  # 优先 rg，降级 grep
 dev find NAME [PATH] [--host HOST] [--type TYPE] [--json]
 dev tail FILE [--host HOST] [--lines N] [--json]
+dev agent start TASK --cwd REMOTE_DIR [--agent AGENT] [--message MSG] [--prompt-file FILE] [--wait N] [--host HOST] [--json]
+dev agent send TASK [MESSAGE] [--wait N] [--lines N] [--chars N] [--compact] [--host HOST] [--json]
+dev agent tail TASK [--lines N] [--chars N] [--compact] [--host HOST] [--json]
+dev agent interrupt TASK [--host HOST] [--json]
+dev agent status TASK [--preview-lines N] [--preview-chars N] [--host HOST] [--json]
+dev agent diff TASK [--stat] [--name-only] [--file PATH] [--max-chars N] [--full] [--host HOST] [--json]
+dev agent list [--host HOST] [--json]
+dev agent stop TASK [--purge] [--host HOST] [--json]
 dev config show|add|set-default
 ```
 

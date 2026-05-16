@@ -305,6 +305,210 @@ def edit(ctx: click.Context) -> None:
     pass
 
 
+@main.group()
+@click.pass_context
+def agent(ctx: click.Context) -> None:
+    """控制远程交互式 agent 会话."""
+    pass
+
+
+@agent.command()
+@click.argument("task")
+@click.option("--cwd", required=True, help="远程 agent 启动目录")
+@click.option("--agent", "agent_name", default="claude", help="agent 类型或启动命令")
+@click.option("--message", "-m", help="启动后发送的首条消息")
+@click.option(
+    "--prompt-file",
+    type=click.Path(exists=True, dir_okay=False),
+    help="启动后发送的本地 prompt 文件",
+)
+@click.option("--wait", default=0, help="发送首条消息后等待秒数并返回输出")
+@click.option("--lines", default=120, help="等待后返回的输出行数")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def start(
+    ctx: click.Context,
+    task: str,
+    cwd: str,
+    agent_name: str,
+    message: str | None,
+    prompt_file: str | None,
+    wait: int,
+    lines: int,
+    host_alias: str | None,
+) -> None:
+    """启动远程 agent 会话."""
+    from dev_connect.commands.agent import start_agent
+
+    if message and prompt_file:
+        raise click.ClickException("--message 和 --prompt-file 只能指定一个")
+    initial_message = message
+    if prompt_file:
+        initial_message = Path(prompt_file).read_text()
+    json_output = ctx.obj.get("json_output", False)
+    start_agent(
+        task,
+        _normalize_path(cwd),
+        agent_name,
+        initial_message,
+        wait,
+        lines,
+        host_alias,
+        json_output,
+    )
+
+
+@agent.command()
+@click.argument("task")
+@click.argument("message", required=False)
+@click.option("--wait", default=0, help="发送后等待秒数并返回输出")
+@click.option("--lines", default=120, help="等待后返回的输出行数")
+@click.option("--chars", type=int, help="限制返回输出字符数")
+@click.option("--compact", is_flag=True, help="去掉空行，降低 tmux UI 噪声")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def send(
+    ctx: click.Context,
+    task: str,
+    message: str | None,
+    wait: int,
+    lines: int,
+    chars: int | None,
+    compact: bool,
+    host_alias: str | None,
+) -> None:
+    """向远程 agent 发送消息."""
+    from dev_connect.commands.agent import send_agent
+
+    if message is None:
+        stdin = click.get_text_stream("stdin")
+        message = "" if stdin.isatty() else stdin.read()
+    json_output = ctx.obj.get("json_output", False)
+    send_agent(task, message, wait, lines, chars, compact, host_alias, json_output)
+
+
+@agent.command("tail")
+@click.argument("task")
+@click.option("--lines", "-n", default=120, help="显示行数")
+@click.option("--chars", type=int, help="限制输出字符数")
+@click.option("--compact", is_flag=True, help="去掉空行，降低 tmux UI 噪声")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def tail_agent_output(
+    ctx: click.Context,
+    task: str,
+    lines: int,
+    chars: int | None,
+    compact: bool,
+    host_alias: str | None,
+) -> None:
+    """读取远程 agent 最近输出."""
+    from dev_connect.commands.agent import tail_agent
+
+    json_output = ctx.obj.get("json_output", False)
+    tail_agent(task, lines, chars, compact, host_alias, json_output)
+
+
+@agent.command()
+@click.argument("task")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def interrupt(
+    ctx: click.Context,
+    task: str,
+    host_alias: str | None,
+) -> None:
+    """打断远程 agent 当前动作."""
+    from dev_connect.commands.agent import interrupt_agent
+
+    json_output = ctx.obj.get("json_output", False)
+    interrupt_agent(task, host_alias, json_output)
+
+
+@agent.command()
+@click.argument("task")
+@click.option("--preview-lines", default=20, help="tail preview 行数")
+@click.option("--preview-chars", default=2000, help="tail preview 字符数")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def status(
+    ctx: click.Context,
+    task: str,
+    preview_lines: int,
+    preview_chars: int,
+    host_alias: str | None,
+) -> None:
+    """查看远程 agent 会话状态."""
+    from dev_connect.commands.agent import status_agent
+
+    json_output = ctx.obj.get("json_output", False)
+    status_agent(task, preview_lines, preview_chars, host_alias, json_output)
+
+
+@agent.command("diff")
+@click.argument("task")
+@click.option("--stat", "stat", is_flag=True, help="只显示 diff 统计")
+@click.option("--name-only", is_flag=True, help="只显示变更文件名")
+@click.option("--file", "file_path", help="只查看指定文件")
+@click.option("--max-chars", default=20000, help="限制 diff 输出字符数")
+@click.option("--full", is_flag=True, help="输出完整 diff")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def agent_diff(
+    ctx: click.Context,
+    task: str,
+    stat: bool,
+    name_only: bool,
+    file_path: str | None,
+    max_chars: int,
+    full: bool,
+    host_alias: str | None,
+) -> None:
+    """查看远程 agent 工作目录 diff."""
+    from dev_connect.commands.agent import diff_agent
+
+    json_output = ctx.obj.get("json_output", False)
+    diff_agent(
+        task,
+        stat,
+        name_only,
+        file_path,
+        max_chars,
+        full,
+        host_alias,
+        json_output,
+    )
+
+
+@agent.command("list")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def agent_list(ctx: click.Context, host_alias: str | None) -> None:
+    """列出远程 agent 会话."""
+    from dev_connect.commands.agent import list_agents
+
+    json_output = ctx.obj.get("json_output", False)
+    list_agents(host_alias, json_output)
+
+
+@agent.command()
+@click.argument("task")
+@click.option("--purge", is_flag=True, help="同时删除远程状态目录")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def stop(
+    ctx: click.Context,
+    task: str,
+    purge: bool,
+    host_alias: str | None,
+) -> None:
+    """停止远程 agent 会话."""
+    from dev_connect.commands.agent import stop_agent
+
+    json_output = ctx.obj.get("json_output", False)
+    stop_agent(task, purge, host_alias, json_output)
+
+
 @edit.command()
 @click.argument("path")
 @click.argument("old")

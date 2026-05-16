@@ -78,6 +78,11 @@ dev exec "ls -la | head -10"
 
 # 目录树
 dev tree ~/projects --depth 2
+
+# 远程 agent 会话
+dev agent start task-demo --cwd /home/maifeng/project --agent claude
+dev agent send task-demo "先阅读代码，给出改动计划"
+dev agent tail task-demo
 ```
 
 ### 3. JSON 输出（Agent 友好）
@@ -214,6 +219,38 @@ dev tail FILE [--host HOST] [--lines N] [--json]
 - `FILE`：文件路径
 - `--host, -H`：主机别名
 - `--lines, -n`：显示行数，默认 20
+- `--json`：JSON 格式输出
+
+### dev agent
+
+控制远程 `tmux + Claude Code / Codex` 交互式 agent 会话。
+
+```bash
+dev agent start TASK --cwd REMOTE_DIR [--agent AGENT] [--message MSG] [--prompt-file FILE] [--wait N] [--host HOST] [--json]
+dev agent send TASK [MESSAGE] [--wait N] [--lines N] [--chars N] [--compact] [--host HOST] [--json]
+dev agent tail TASK [--lines N] [--chars N] [--compact] [--host HOST] [--json]
+dev agent interrupt TASK [--host HOST] [--json]
+dev agent status TASK [--preview-lines N] [--preview-chars N] [--host HOST] [--json]
+dev agent diff TASK [--stat] [--name-only] [--file PATH] [--max-chars N] [--full] [--host HOST] [--json]
+dev agent list [--host HOST] [--json]
+dev agent stop TASK [--purge] [--host HOST] [--json]
+```
+
+- `TASK`：本次远程会话名称，只能包含字母、数字、下划线、点和短横线
+- `--cwd`：远程 agent 启动目录
+- `--agent`：agent 类型或启动命令，默认 `claude`
+- `claude` 会优先启动远程 `cc`，不存在时降级为 `claude`
+- `cc` 会直接启动远程 `cc`，适合复用带权限参数的 Claude alias
+- `codex` 会直接启动远程 `codex`
+- `send` 不传 `MESSAGE` 时会从 stdin 读取；stdin 为空时只发送 Enter
+- `start --message` / `--prompt-file` 会启动后发送首条消息
+- `send --wait` 会等待后返回最近输出，减少一次 `tail`
+- `tail --compact` 只做去空行，不做智能摘要
+- 状态文件保存在远程 `~/.dev-connect/agents/<TASK>/session.json`
+- `diff` 基于状态文件中的 `cwd` 执行远程 `git diff`
+- `diff` 默认限制输出字符数，完整输出需显式加 `--full`
+- `stop` 默认只停止 tmux session，`--purge` 会删除状态目录
+- `--host, -H`：主机别名，不传时使用默认主机
 - `--json`：JSON 格式输出
 
 ### dev config
