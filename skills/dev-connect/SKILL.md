@@ -184,6 +184,28 @@ dev agent interrupt TASK [--host HOST]
 dev agent status TASK [--host HOST]
 ```
 
+### 查看 diff
+
+```bash
+dev agent diff TASK [--stat] [--name-only] [--file PATH] [--host HOST]
+```
+
+基于状态文件中的 `cwd` 执行远程 `git diff`。
+
+### 列出会话
+
+```bash
+dev agent list [--host HOST]
+```
+
+### 停止会话
+
+```bash
+dev agent stop TASK [--purge] [--host HOST]
+```
+
+默认只停止 tmux session；`--purge` 会删除远程状态目录。
+
 ## 配置管理
 
 ```bash

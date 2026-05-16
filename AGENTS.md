@@ -56,6 +56,9 @@ dev agent send TASK MESSAGE [--host HOST] [--json]
 dev agent tail TASK [--lines N] [--host HOST] [--json]
 dev agent interrupt TASK [--host HOST] [--json]
 dev agent status TASK [--host HOST] [--json]
+dev agent diff TASK [--stat] [--name-only] [--file PATH] [--host HOST] [--json]
+dev agent list [--host HOST] [--json]
+dev agent stop TASK [--purge] [--host HOST] [--json]
 dev config show|add|set-default
 ```
 

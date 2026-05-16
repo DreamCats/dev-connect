@@ -43,3 +43,8 @@ def test_agent_command_allows_explicit_command():
         _agent_command("claude --dangerously-skip-permissions")
         == "claude --dangerously-skip-permissions"
     )
+
+
+def test_validate_task_accepts_list_safe_name():
+    """list/stop/diff 复用同一 task 命名规则."""
+    assert _validate_task("agent.demo_2") == "agent.demo_2"

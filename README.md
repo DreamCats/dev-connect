@@ -231,6 +231,9 @@ dev agent send TASK MESSAGE [--host HOST] [--json]
 dev agent tail TASK [--lines N] [--host HOST] [--json]
 dev agent interrupt TASK [--host HOST] [--json]
 dev agent status TASK [--host HOST] [--json]
+dev agent diff TASK [--stat] [--name-only] [--file PATH] [--host HOST] [--json]
+dev agent list [--host HOST] [--json]
+dev agent stop TASK [--purge] [--host HOST] [--json]
 ```
 
 - `TASK`：本次远程会话名称，只能包含字母、数字、下划线、点和短横线
@@ -240,6 +243,8 @@ dev agent status TASK [--host HOST] [--json]
 - `cc` 会直接启动远程 `cc`，适合复用带权限参数的 Claude alias
 - `codex` 会直接启动远程 `codex`
 - 状态文件保存在远程 `~/.dev-connect/agents/<TASK>/session.json`
+- `diff` 基于状态文件中的 `cwd` 执行远程 `git diff`
+- `stop` 默认只停止 tmux session，`--purge` 会删除状态目录
 - `--host, -H`：主机别名，不传时使用默认主机
 - `--json`：JSON 格式输出
 

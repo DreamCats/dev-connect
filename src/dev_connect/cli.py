@@ -400,6 +400,57 @@ def status(
     status_agent(task, host_alias, json_output)
 
 
+@agent.command("diff")
+@click.argument("task")
+@click.option("--stat", "stat", is_flag=True, help="只显示 diff 统计")
+@click.option("--name-only", is_flag=True, help="只显示变更文件名")
+@click.option("--file", "file_path", help="只查看指定文件")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def agent_diff(
+    ctx: click.Context,
+    task: str,
+    stat: bool,
+    name_only: bool,
+    file_path: str | None,
+    host_alias: str | None,
+) -> None:
+    """查看远程 agent 工作目录 diff."""
+    from dev_connect.commands.agent import diff_agent
+
+    json_output = ctx.obj.get("json_output", False)
+    diff_agent(task, stat, name_only, file_path, host_alias, json_output)
+
+
+@agent.command("list")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def agent_list(ctx: click.Context, host_alias: str | None) -> None:
+    """列出远程 agent 会话."""
+    from dev_connect.commands.agent import list_agents
+
+    json_output = ctx.obj.get("json_output", False)
+    list_agents(host_alias, json_output)
+
+
+@agent.command()
+@click.argument("task")
+@click.option("--purge", is_flag=True, help="同时删除远程状态目录")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def stop(
+    ctx: click.Context,
+    task: str,
+    purge: bool,
+    host_alias: str | None,
+) -> None:
+    """停止远程 agent 会话."""
+    from dev_connect.commands.agent import stop_agent
+
+    json_output = ctx.obj.get("json_output", False)
+    stop_agent(task, purge, host_alias, json_output)
+
+
 @edit.command()
 @click.argument("path")
 @click.argument("old")

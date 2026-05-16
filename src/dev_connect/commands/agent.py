@@ -232,6 +232,158 @@ PY"""
         _print_status(payload)
 
 
+def diff_agent(
+    task: str,
+    stat: bool,
+    name_only: bool,
+    file_path: str | None,
+    host_alias: str | None,
+    json_output: bool,
+) -> None:
+    """查看远程 agent 工作目录的 git diff."""
+    task = _validate_task(task)
+    state_file = f"{_state_dir(task)}/session.json"
+    diff_args = ["diff"]
+    if stat:
+        diff_args.append("--stat")
+    if name_only:
+        diff_args.append("--name-only")
+    if file_path:
+        diff_args.extend(["--", file_path])
+
+    cmd = f"""python3 - <<'PY'
+import json
+import subprocess
+import sys
+from pathlib import Path
+
+state_file = Path({state_file!r}).expanduser()
+if not state_file.exists():
+    print("session state not found", file=sys.stderr)
+    raise SystemExit(1)
+
+data = json.loads(state_file.read_text())
+cwd = data.get("cwd")
+if not cwd:
+    print("session cwd not found", file=sys.stderr)
+    raise SystemExit(1)
+
+args = ["git", "-C", cwd] + {diff_args!r}
+result = subprocess.run(args, capture_output=True, text=True)
+payload = {{
+    "task": {task!r},
+    "cwd": cwd,
+    "command": " ".join(args),
+    "returncode": result.returncode,
+    "stdout": result.stdout,
+    "stderr": result.stderr,
+    "has_changes": bool(result.stdout),
+}}
+print(json.dumps(payload, ensure_ascii=False))
+raise SystemExit(result.returncode)
+PY"""
+    result = run_command(cmd, host_alias)
+    if result.stdout:
+        payload = json.loads(result.stdout)
+        if json_output:
+            click.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+        else:
+            if payload["stdout"]:
+                click.echo(payload["stdout"], nl=False)
+            if payload["stderr"]:
+                click.echo(payload["stderr"], err=True, nl=False)
+        if payload["returncode"] != 0:
+            sys.exit(payload["returncode"])
+        return
+    _exit_on_failure(result.stderr, result.returncode)
+
+
+def list_agents(host_alias: str | None, json_output: bool) -> None:
+    """列出远程 agent 会话."""
+    cmd = f"""python3 - <<'PY'
+import json
+import subprocess
+from pathlib import Path
+
+root = Path({STATE_ROOT!r}).expanduser()
+items = []
+if root.exists():
+    for state_file in sorted(root.glob("*/session.json")):
+        try:
+            data = json.loads(state_file.read_text())
+        except Exception as exc:
+            data = {{"task": state_file.parent.name, "error": str(exc)}}
+        task = data.get("task") or state_file.parent.name
+        session = data.get("tmux_session") or f"dc-agent-{{task}}"
+        alive = subprocess.run(
+            ["tmux", "has-session", "-t", session],
+            stdout=subprocess.DEVNULL,
+            stderr=subprocess.DEVNULL,
+        ).returncode == 0
+        data["task"] = task
+        data["tmux_session"] = session
+        data["alive"] = alive
+        items.append(data)
+
+print(json.dumps(items, ensure_ascii=False))
+PY"""
+    result = run_command(cmd, host_alias)
+    _exit_on_failure(result.stderr, result.returncode)
+    payload = json.loads(result.stdout)
+
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        if not payload:
+            click.echo("no agent sessions")
+            return
+        for item in payload:
+            alive = "alive" if item.get("alive") else "dead"
+            task = item.get("task", "")
+            cwd = item.get("cwd", "")
+            agent = item.get("agent", "")
+            click.echo(f"{task}\t{alive}\t{agent}\t{cwd}")
+
+
+def stop_agent(
+    task: str,
+    purge: bool,
+    host_alias: str | None,
+    json_output: bool,
+) -> None:
+    """停止远程 agent 会话."""
+    task = _validate_task(task)
+    session = _session_name(task)
+    state_dir = _state_dir(task)
+    steps = [
+        "alive=0",
+        (
+            f"if tmux has-session -t {shlex.quote(session)} 2>/dev/null; "
+            f"then tmux kill-session -t {shlex.quote(session)}; alive=1; fi"
+        ),
+    ]
+    if purge:
+        steps.append(f"rm -rf {state_dir}")
+    steps.append('printf "stopped=%s\\n" "$alive"')
+    cmd = "\n".join(steps)
+    result = run_command(cmd, host_alias)
+    _exit_on_failure(result.stderr, result.returncode)
+    stopped = "stopped=1" in result.stdout.splitlines()
+
+    if json_output:
+        payload = {
+            "task": task,
+            "tmux_session": session,
+            "stopped": stopped,
+            "purged": purge,
+        }
+        click.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        click.echo(f"stopped {task}" if stopped else f"{task} was not running")
+        if purge:
+            click.echo(f"purged {_state_dir(task)}")
+
+
 def _validate_task(task: str) -> str:
     if not TASK_RE.fullmatch(task):
         raise click.ClickException("task 只能包含字母、数字、下划线、点和短横线")
