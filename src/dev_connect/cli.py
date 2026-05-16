@@ -305,6 +305,101 @@ def edit(ctx: click.Context) -> None:
     pass
 
 
+@main.group()
+@click.pass_context
+def agent(ctx: click.Context) -> None:
+    """控制远程交互式 agent 会话."""
+    pass
+
+
+@agent.command()
+@click.argument("task")
+@click.option("--cwd", required=True, help="远程 agent 启动目录")
+@click.option("--agent", "agent_name", default="claude", help="agent 类型或启动命令")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def start(
+    ctx: click.Context,
+    task: str,
+    cwd: str,
+    agent_name: str,
+    host_alias: str | None,
+) -> None:
+    """启动远程 agent 会话."""
+    from dev_connect.commands.agent import start_agent
+
+    json_output = ctx.obj.get("json_output", False)
+    start_agent(task, _normalize_path(cwd), agent_name, host_alias, json_output)
+
+
+@agent.command()
+@click.argument("task")
+@click.argument("message")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def send(
+    ctx: click.Context,
+    task: str,
+    message: str,
+    host_alias: str | None,
+) -> None:
+    """向远程 agent 发送消息."""
+    from dev_connect.commands.agent import send_agent
+
+    json_output = ctx.obj.get("json_output", False)
+    send_agent(task, message, host_alias, json_output)
+
+
+@agent.command("tail")
+@click.argument("task")
+@click.option("--lines", "-n", default=120, help="显示行数")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def tail_agent_output(
+    ctx: click.Context,
+    task: str,
+    lines: int,
+    host_alias: str | None,
+) -> None:
+    """读取远程 agent 最近输出."""
+    from dev_connect.commands.agent import tail_agent
+
+    json_output = ctx.obj.get("json_output", False)
+    tail_agent(task, lines, host_alias, json_output)
+
+
+@agent.command()
+@click.argument("task")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def interrupt(
+    ctx: click.Context,
+    task: str,
+    host_alias: str | None,
+) -> None:
+    """打断远程 agent 当前动作."""
+    from dev_connect.commands.agent import interrupt_agent
+
+    json_output = ctx.obj.get("json_output", False)
+    interrupt_agent(task, host_alias, json_output)
+
+
+@agent.command()
+@click.argument("task")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def status(
+    ctx: click.Context,
+    task: str,
+    host_alias: str | None,
+) -> None:
+    """查看远程 agent 会话状态."""
+    from dev_connect.commands.agent import status_agent
+
+    json_output = ctx.obj.get("json_output", False)
+    status_agent(task, host_alias, json_output)
+
+
 @edit.command()
 @click.argument("path")
 @click.argument("old")

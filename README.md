@@ -78,6 +78,11 @@ dev exec "ls -la | head -10"
 
 # 目录树
 dev tree ~/projects --depth 2
+
+# 远程 agent 会话
+dev agent start task-demo --cwd /home/maifeng/project --agent claude
+dev agent send task-demo "先阅读代码，给出改动计划"
+dev agent tail task-demo
 ```
 
 ### 3. JSON 输出（Agent 友好）
@@ -214,6 +219,27 @@ dev tail FILE [--host HOST] [--lines N] [--json]
 - `FILE`：文件路径
 - `--host, -H`：主机别名
 - `--lines, -n`：显示行数，默认 20
+- `--json`：JSON 格式输出
+
+### dev agent
+
+控制远程 `tmux + Claude Code / Codex` 交互式 agent 会话。
+
+```bash
+dev agent start TASK --cwd REMOTE_DIR [--agent AGENT] [--host HOST] [--json]
+dev agent send TASK MESSAGE [--host HOST] [--json]
+dev agent tail TASK [--lines N] [--host HOST] [--json]
+dev agent interrupt TASK [--host HOST] [--json]
+dev agent status TASK [--host HOST] [--json]
+```
+
+- `TASK`：本次远程会话名称，只能包含字母、数字、下划线、点和短横线
+- `--cwd`：远程 agent 启动目录
+- `--agent`：agent 类型或启动命令，默认 `claude`
+- `claude` 会映射为远程 `cc`，用于复用远程 `.zshrc` 中的 Claude alias
+- `codex` 会直接启动远程 `codex`
+- 状态文件保存在远程 `~/.dev-connect/agents/<TASK>/session.json`
+- `--host, -H`：主机别名，不传时使用默认主机
 - `--json`：JSON 格式输出
 
 ### dev config

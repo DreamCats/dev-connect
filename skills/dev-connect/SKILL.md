@@ -146,6 +146,43 @@ dev tail FILE [--host HOST] [--lines N]
 
 - 示例：`dev tail ~/logs/app.log -n 100`
 
+## 远程 agent 会话
+
+### 启动会话
+
+```bash
+dev agent start TASK --cwd REMOTE_DIR [--agent AGENT] [--host HOST]
+```
+
+- 底层使用远程 `tmux` 启动交互式 agent
+- `--agent claude` 会映射为远程 `cc`
+- `--agent codex` 会启动远程 `codex`
+- 状态记录在远程 `~/.dev-connect/agents/<TASK>/session.json`
+
+### 发送指令
+
+```bash
+dev agent send TASK MESSAGE [--host HOST]
+```
+
+### 读取输出
+
+```bash
+dev agent tail TASK [--lines N] [--host HOST]
+```
+
+### 打断会话
+
+```bash
+dev agent interrupt TASK [--host HOST]
+```
+
+### 查看状态
+
+```bash
+dev agent status TASK [--host HOST]
+```
+
 ## 配置管理
 
 ```bash
