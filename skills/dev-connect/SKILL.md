@@ -18,8 +18,11 @@ dev ls [PATH] [--host HOST]
 ### 查看文件
 
 ```bash
-dev cat PATH [--host HOST]
+dev cat PATH... [--host HOST] [--cwd CWD]
 ```
+
+- 支持一次读取多个文件
+- `--cwd` 用于在远程仓库目录下读取相对路径
 
 ### 上传文件
 
@@ -119,6 +122,24 @@ dev diff FILE1 FILE2 [--host HOST] [--local]
   dev --json diff ~/old.py ~/new.py         # JSON 输出
   ```
 
+### 应用远程 patch
+
+```bash
+dev patch --cwd REPO [--host HOST] [--check] < changes.patch
+```
+
+- 远端执行 `git apply --check`，通过后再 `git apply`
+- 失败时返回完整 stdout/stderr，不应用半截 patch
+- `--check` 只校验不应用
+
+### 仓库状态快照
+
+```bash
+dev repo-status --cwd REPO [--host HOST]
+```
+
+- 一次返回 branch、upstream、dirty、status、diff stat、最近 commits
+
 ## 执行调试
 
 ### 查看文件开头
@@ -137,6 +158,7 @@ dev exec COMMAND [--host HOST] [--timeout TIMEOUT]
 ```
 
 - 示例：`dev exec "ps aux | grep python"`
+- `--timeout` 未指定时使用主机配置 `exec_timeout`，再降级到 30 秒
 
 ### 查看日志末尾
 
@@ -215,8 +237,10 @@ dev agent stop TASK [--purge] [--host HOST]
 
 ```bash
 dev config show                                    # 查看配置
-dev config add ALIAS HOSTNAME [--user USER] [--default]  # 添加主机
+dev config add ALIAS HOSTNAME [--user USER] [--shell SHELL] [--exec-timeout N] [--default]
 dev config set-default ALIAS                       # 设置默认主机
+dev config set-shell ALIAS zsh                     # 设置 dev exec 默认 shell
+dev config set-exec-timeout ALIAS 120              # 设置 dev exec 默认超时
 ```
 
 ## 通用选项

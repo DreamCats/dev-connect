@@ -10,6 +10,8 @@ class HostConfig(BaseModel):
 
     hostname: str
     user: str = "maifeng"
+    shell: str | None = None
+    exec_timeout: int | None = None
 
 
 class AppConfig(BaseModel):

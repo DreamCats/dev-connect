@@ -63,6 +63,7 @@ dev ls --host sgdev ~
 # 查看文件
 dev cat ~/.bashrc
 dev cat -H dev ~/.zshrc
+dev cat --host sgdev --cwd ~/project pyproject.toml src/app.py
 
 # 上传文件
 dev push ./local.txt ~/remote.txt
@@ -75,6 +76,13 @@ dev pull ~/remote_dir/ ./local_dir/
 # 执行命令
 dev exec "uname -a"
 dev exec "ls -la | head -10"
+dev exec "which cc" --shell zsh
+
+# 应用远程 patch
+dev patch --host sgdev --cwd ~/project < changes.patch
+
+# 仓库状态快照
+dev repo-status --host sgdev --cwd ~/project
 
 # 目录树
 dev tree ~/projects --depth 2
@@ -122,12 +130,15 @@ dev ls [PATH] [--host HOST] [--json]
 查看文件内容。
 
 ```bash
-dev cat PATH [--host HOST] [--json]
+dev cat PATH... [--host HOST] [--cwd CWD] [--json]
 ```
 
-- `PATH`：文件路径
+- `PATH...`：一个或多个文件路径
 - `--host, -H`：主机别名
+- `--cwd`：远程工作目录，相对路径会在该目录下读取
 - `--json`：JSON 格式输出
+
+多个文件的普通输出会带文件分隔符；JSON 输出返回 `files` 数组，每个文件包含 `path`、`content`、`size`、`success`、`error`。
 
 ### dev push
 
@@ -158,12 +169,47 @@ dev pull REMOTE_PATH LOCAL_PATH [--host HOST]
 执行远程命令。
 
 ```bash
-dev exec COMMAND [--host HOST] [--timeout TIMEOUT] [--json]
+dev exec COMMAND [--host HOST] [--timeout TIMEOUT] [--shell SHELL] [--json]
 ```
 
 - `COMMAND`：要执行的命令
 - `--host, -H`：主机别名
-- `--timeout, -t`：超时时间（秒），默认 30
+- `--timeout, -t`：超时时间（秒），优先级高于主机配置，未设置时默认 30
+- `--shell`：远端 shell 包裹，仅影响 `dev exec`。可选 `none`、`zsh`、`zsh-login`、`bash`、`bash-login`；`zsh` 会加载 `~/.zshrc`
+- `--json`：JSON 格式输出
+
+主机配置也可以设置 `shell`，作为 `dev exec` 的默认远端 shell：
+
+```bash
+dev config add sgdev 10.251.233.15 --default --shell zsh
+dev config set-shell sgdev zsh-login
+dev config set-shell sgdev none
+dev config set-exec-timeout sgdev 120
+```
+
+### dev patch
+
+在远程 Git 仓库中应用标准 patch。默认先执行 `git apply --check`，通过后再执行 `git apply`。
+
+```bash
+dev patch --cwd REPO < changes.patch [--host HOST] [--check] [--json]
+```
+
+- `--cwd`：远程 Git 仓库目录
+- `--host, -H`：主机别名
+- `--check`：只校验，不应用
+- `--json`：JSON 格式输出，包含 `stdout`、`stderr`、`returncode`、`success`
+
+### dev repo-status
+
+一次返回远程仓库快照，包括 branch、upstream、dirty、status、diff stat 和最近 5 个 commit。
+
+```bash
+dev repo-status --cwd REPO [--host HOST] [--json]
+```
+
+- `--cwd`：远程 Git 仓库目录
+- `--host, -H`：主机别名
 - `--json`：JSON 格式输出
 
 ### dev tree

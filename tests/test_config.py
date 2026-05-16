@@ -22,7 +22,12 @@ def sample_config():
         default_host="sgdev",
         hosts={
             "sgdev": HostConfig(hostname="10.251.233.15", user="maifeng"),
-            "dev": HostConfig(hostname="10.37.122.5", user="maifeng"),
+            "dev": HostConfig(
+                hostname="10.37.122.5",
+                user="maifeng",
+                shell="zsh",
+                exec_timeout=120,
+            ),
         },
     )
 
@@ -52,6 +57,8 @@ def test_save_and_load(temp_config_dir, monkeypatch, sample_config):
     assert loaded.default_host == "sgdev"
     assert "sgdev" in loaded.hosts
     assert loaded.hosts["sgdev"].hostname == "10.251.233.15"
+    assert loaded.hosts["dev"].shell == "zsh"
+    assert loaded.hosts["dev"].exec_timeout == 120
 
 
 def test_get_host_with_alias(sample_config, temp_config_dir, monkeypatch):

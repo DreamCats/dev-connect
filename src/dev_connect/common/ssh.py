@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+import shlex
 import subprocess
 from dataclasses import dataclass
 
 from dev_connect.common.config import get_host
 from dev_connect.common.exceptions import CommandError, TimeoutError, TransferError
 from dev_connect.models import HostConfig
+
+SHELL_PRESETS = {
+    "zsh": "zsh -ic",
+    "zsh-login": "zsh -lic",
+    "bash": "bash -ic",
+    "bash-login": "bash -lic",
+}
 
 
 @dataclass
@@ -27,10 +35,12 @@ def run_command(
     cmd: str,
     host_alias: str | None = None,
     timeout: int = 30,
+    shell: str | None = None,
+    stdin: str | None = None,
 ) -> SSHResult:
     """执行远程命令."""
     host = get_host(host_alias)
-    ssh_cmd = _build_ssh_cmd(host, cmd)
+    ssh_cmd = _build_ssh_cmd(host, _wrap_shell_cmd(cmd, shell))
 
     try:
         result = subprocess.run(
@@ -38,6 +48,7 @@ def run_command(
             capture_output=True,
             text=True,
             timeout=timeout,
+            input=stdin,
         )
         return SSHResult(
             returncode=result.returncode,
@@ -119,6 +130,24 @@ def _build_ssh_cmd(host: HostConfig, cmd: str) -> list[str]:
         f"{host.user}@{host.hostname}",
         cmd,
     ]
+
+
+def _wrap_shell_cmd(cmd: str, shell: str | None) -> str:
+    """按需用远端交互 shell 包裹命令."""
+    if shell is None or shell == "" or shell == "none":
+        return cmd
+
+    shell_cmd = SHELL_PRESETS.get(shell, shell)
+    return f"{shell_cmd} {shlex.quote(cmd)}"
+
+
+def quote_remote_path(path: str) -> str:
+    """引用远端路径，同时保留 ~/ 的远端 home 语义."""
+    if path == "~":
+        return "$HOME"
+    if path.startswith("~/"):
+        return "$HOME/" + shlex.quote(path[2:])
+    return shlex.quote(path)
 
 
 def _build_scp_cmd(

@@ -10,6 +10,8 @@ from dev_connect import __version__
 from dev_connect.common.config import load, save
 from dev_connect.models import HostConfig
 
+SHELL_CHOICES = ("none", "zsh", "zsh-login", "bash", "bash-login")
+
 
 def _normalize_path(path: str) -> str:
     """处理路径，将本地 home 目录转换为 ~."""
@@ -94,15 +96,23 @@ def ls(ctx: click.Context, path: str, host_alias: str | None) -> None:
 
 
 @main.command()
-@click.argument("path")
+@click.argument("paths", nargs=-1, required=True)
 @click.option("--host", "-h", "host_alias", help="主机别名，如 @sgdev")
+@click.option("--cwd", help="远程工作目录，用于读取相对路径")
 @click.pass_context
-def cat(ctx: click.Context, path: str, host_alias: str | None) -> None:
+def cat(
+    ctx: click.Context,
+    paths: tuple[str, ...],
+    host_alias: str | None,
+    cwd: str | None,
+) -> None:
     """查看文件内容."""
     from dev_connect.commands.cat import show_file
 
     json_output = ctx.obj.get("json_output", False)
-    show_file(_normalize_path(path), host_alias, json_output)
+    normalized = tuple(_normalize_path(path) for path in paths)
+    normalized_cwd = _normalize_path(cwd) if cwd else None
+    show_file(normalized, host_alias, json_output, normalized_cwd)
 
 
 @main.command()
@@ -136,14 +146,62 @@ def pull(
 @main.command()
 @click.argument("cmd")
 @click.option("--host", "-h", "host_alias", help="主机别名，如 @sgdev")
-@click.option("--timeout", "-t", default=30, help="超时时间（秒）")
+@click.option("--timeout", "-t", type=int, help="超时时间（秒）")
+@click.option(
+    "--shell",
+    type=click.Choice(SHELL_CHOICES),
+    help="远端 shell 包裹，仅影响 dev exec；zsh 会加载 ~/.zshrc",
+)
 @click.pass_context
-def exec(ctx: click.Context, cmd: str, host_alias: str | None, timeout: int) -> None:
+def exec(
+    ctx: click.Context,
+    cmd: str,
+    host_alias: str | None,
+    timeout: int | None,
+    shell: str | None,
+) -> None:
     """执行远程命令."""
     from dev_connect.commands.exec import execute_command
 
     json_output = ctx.obj.get("json_output", False)
-    execute_command(cmd, host_alias, timeout, json_output)
+    execute_command(cmd, host_alias, timeout, json_output, shell)
+
+
+@main.command()
+@click.option("--cwd", required=True, help="远程 Git 仓库目录")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.option("--check", "check_only", is_flag=True, help="只执行 git apply --check")
+@click.pass_context
+def patch(
+    ctx: click.Context,
+    cwd: str,
+    host_alias: str | None,
+    check_only: bool,
+) -> None:
+    """在远程仓库中应用标准 git patch."""
+    from dev_connect.commands.patch import apply_git_patch
+
+    json_output = ctx.obj.get("json_output", False)
+    patch_content = click.get_text_stream("stdin").read()
+    apply_git_patch(
+        _normalize_path(cwd),
+        patch_content,
+        check_only,
+        host_alias,
+        json_output,
+    )
+
+
+@main.command("repo-status")
+@click.option("--cwd", required=True, help="远程 Git 仓库目录")
+@click.option("--host", "-H", "host_alias", help="主机别名，如 sgdev")
+@click.pass_context
+def repo_status(ctx: click.Context, cwd: str, host_alias: str | None) -> None:
+    """返回远程 Git 仓库状态快照."""
+    from dev_connect.commands.repo_status import show_repo_status
+
+    json_output = ctx.obj.get("json_output", False)
+    show_repo_status(_normalize_path(cwd), host_alias, json_output)
 
 
 @main.command()
@@ -633,21 +691,44 @@ def show(ctx: click.Context) -> None:
         click.echo(f"默认主机: {cfg.default_host or '(未设置)'}")
         click.echo("\n已配置主机:")
         for alias, host in cfg.hosts.items():
-            click.echo(f"  {alias}: {host.user}@{host.hostname}")
+            extras = []
+            if host.shell:
+                extras.append(f"shell={host.shell}")
+            if host.exec_timeout:
+                extras.append(f"exec_timeout={host.exec_timeout}")
+            suffix = f" ({', '.join(extras)})" if extras else ""
+            click.echo(f"  {alias}: {host.user}@{host.hostname}{suffix}")
 
 
 @config.command()
 @click.argument("alias")
 @click.argument("hostname")
 @click.option("--user", "-u", default="maifeng", help="用户名")
+@click.option(
+    "--shell",
+    type=click.Choice(SHELL_CHOICES),
+    help="dev exec 默认远端 shell；zsh 会加载 ~/.zshrc",
+)
+@click.option("--exec-timeout", type=int, help="dev exec 默认超时时间（秒）")
 @click.option("--default", "-d", "set_default", is_flag=True, help="设为默认主机")
 @click.pass_context
 def add(
-    ctx: click.Context, alias: str, hostname: str, user: str, set_default: bool
+    ctx: click.Context,
+    alias: str,
+    hostname: str,
+    user: str,
+    shell: str | None,
+    exec_timeout: int | None,
+    set_default: bool,
 ) -> None:
     """添加主机配置."""
     cfg = load()
-    cfg.hosts[alias] = HostConfig(hostname=hostname, user=user)
+    cfg.hosts[alias] = HostConfig(
+        hostname=hostname,
+        user=user,
+        shell=None if shell == "none" else shell,
+        exec_timeout=exec_timeout,
+    )
 
     if set_default:
         cfg.default_host = alias
@@ -657,6 +738,48 @@ def add(
 
     if set_default:
         click.echo("已设为默认主机")
+
+
+@config.command("set-shell")
+@click.argument("alias")
+@click.argument("shell", type=click.Choice(SHELL_CHOICES))
+@click.pass_context
+def set_shell(ctx: click.Context, alias: str, shell: str) -> None:
+    """设置主机的 dev exec 默认 shell."""
+    cfg = load()
+
+    if alias not in cfg.hosts:
+        click.echo(f"错误: 主机 '{alias}' 未配置", err=True)
+        sys.exit(1)
+
+    cfg.hosts[alias].shell = None if shell == "none" else shell
+    save(cfg)
+
+    if shell == "none":
+        click.echo(f"已清除 {alias} 的 dev exec 默认 shell")
+    else:
+        click.echo(f"已设置 {alias} 的 dev exec 默认 shell: {shell}")
+
+
+@config.command("set-exec-timeout")
+@click.argument("alias")
+@click.argument("timeout", type=int)
+@click.pass_context
+def set_exec_timeout(ctx: click.Context, alias: str, timeout: int) -> None:
+    """设置主机的 dev exec 默认超时时间."""
+    cfg = load()
+
+    if alias not in cfg.hosts:
+        click.echo(f"错误: 主机 '{alias}' 未配置", err=True)
+        sys.exit(1)
+
+    cfg.hosts[alias].exec_timeout = None if timeout <= 0 else timeout
+    save(cfg)
+
+    if timeout <= 0:
+        click.echo(f"已清除 {alias} 的 dev exec 默认超时")
+    else:
+        click.echo(f"已设置 {alias} 的 dev exec 默认超时: {timeout} 秒")
 
 
 @config.command()
