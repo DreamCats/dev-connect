@@ -6,6 +6,7 @@ import json
 import re
 import shlex
 import sys
+import time
 from datetime import datetime
 from typing import Any
 
@@ -27,6 +28,9 @@ def start_agent(
     task: str,
     cwd: str,
     agent: str,
+    initial_message: str | None,
+    wait: int,
+    lines: int,
     host_alias: str | None,
     json_output: bool,
 ) -> None:
@@ -68,25 +72,61 @@ def start_agent(
     result = run_command(cmd, host_alias)
     _exit_on_failure(result.stderr, result.returncode)
 
+    payload: dict[str, Any] = session_data | {
+        "alive": True,
+        "reused": _session_reused(result.stdout),
+    }
+
+    if initial_message is not None:
+        send_payload = _send_message(task, initial_message, host_alias)
+        payload["initial_message"] = send_payload
+        if wait > 0:
+            time.sleep(wait)
+            payload["output"] = _capture_tail(task, lines, None, False, host_alias)
+
     if json_output:
-        payload = session_data | {
-            "alive": True,
-            "reused": _session_reused(result.stdout),
-        }
         click.echo(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
         click.echo(f"started {task}: {session}")
         click.echo(f"cwd: {cwd}")
         click.echo(f"agent: {agent_cmd}")
+        if initial_message is not None:
+            click.echo(f"sent to {task}")
+            if wait > 0 and payload.get("output"):
+                click.echo(str(payload["output"]), nl=False)
 
 
 def send_agent(
     task: str,
     message: str,
+    wait: int,
+    lines: int,
+    chars: int | None,
+    compact: bool,
     host_alias: str | None,
     json_output: bool,
 ) -> None:
     """向远程 agent 发送消息."""
+    payload = _send_message(task, message, host_alias)
+
+    if wait > 0:
+        time.sleep(wait)
+        payload["output"] = _capture_tail(task, lines, chars, compact, host_alias)
+
+    if json_output:
+        click.echo(json.dumps(payload, indent=2, ensure_ascii=False))
+    else:
+        click.echo(f"sent to {task}")
+        if wait > 0 and payload.get("output"):
+            click.echo(str(payload["output"]), nl=False)
+
+
+def _send_message(
+    task: str,
+    message: str,
+    host_alias: str | None,
+) -> dict[str, Any]:
+    """向远程 tmux session 发送消息并返回结构化结果."""
     task = _validate_task(task)
     session = _session_name(task)
     now = _now()
@@ -113,26 +153,23 @@ def send_agent(
     result = run_command(cmd, host_alias)
     _exit_on_failure(result.stderr, result.returncode)
 
-    if json_output:
-        payload = {
-            "task": task,
-            "tmux_session": session,
-            "sent": True,
-            "bytes": len(message.encode()),
-            "updated_at": now,
-        }
-        click.echo(json.dumps(payload, indent=2, ensure_ascii=False))
-    else:
-        click.echo(f"sent to {task}")
+    return {
+        "task": task,
+        "tmux_session": session,
+        "sent": True,
+        "bytes": len(message.encode()),
+        "updated_at": now,
+    }
 
 
-def tail_agent(
+def _capture_tail(
     task: str,
     lines: int,
+    chars: int | None,
+    compact: bool,
     host_alias: str | None,
-    json_output: bool,
-) -> None:
-    """读取远程 agent 最近输出."""
+) -> str:
+    """读取并格式化 tmux pane 最近输出."""
     task = _validate_task(task)
     session = _session_name(task)
     lines = max(lines, 1)
@@ -142,17 +179,42 @@ def tail_agent(
     )
     result = run_command(cmd, host_alias)
     _exit_on_failure(result.stderr, result.returncode)
+    return _format_output(result.stdout, chars, compact)
+
+
+def _format_output(output: str, chars: int | None, compact: bool) -> str:
+    """对终端输出做机械截断和去空行."""
+    if compact:
+        output = "\n".join(line for line in output.splitlines() if line.strip())
+        if output:
+            output += "\n"
+    if chars is not None and chars > 0 and len(output) > chars:
+        output = output[-chars:]
+    return output
+
+
+def tail_agent(
+    task: str,
+    lines: int,
+    chars: int | None,
+    compact: bool,
+    host_alias: str | None,
+    json_output: bool,
+) -> None:
+    """读取远程 agent 最近输出."""
+    output = _capture_tail(task, lines, chars, compact, host_alias)
+    session = _session_name(task)
 
     if json_output:
         payload = {
             "task": task,
             "tmux_session": session,
             "alive": True,
-            "output": result.stdout,
+            "output": output,
         }
         click.echo(json.dumps(payload, indent=2, ensure_ascii=False))
     else:
-        click.echo(result.stdout, nl=False)
+        click.echo(output, nl=False)
 
 
 def interrupt_agent(
@@ -179,6 +241,8 @@ def interrupt_agent(
 
 def status_agent(
     task: str,
+    preview_lines: int,
+    preview_chars: int,
     host_alias: str | None,
     json_output: bool,
 ) -> None:
@@ -220,6 +284,21 @@ if cwd:
     data["git_status"] = status.stdout if status.returncode == 0 else ""
     data["dirty"] = bool(data["git_status"])
 
+if alive:
+    preview = subprocess.run(
+        ["tmux", "capture-pane", "-p", "-t", session, "-S", f"-{preview_lines}"],
+        capture_output=True,
+        text=True,
+    )
+    if preview.returncode == 0:
+        lines = [line for line in preview.stdout.splitlines() if line.strip()]
+        text = "\\n".join(lines)
+        if text:
+            text += "\\n"
+        if len(text) > {preview_chars}:
+            text = text[-{preview_chars}:]
+        data["tail_preview"] = text
+
 print(json.dumps(data, ensure_ascii=False))
 PY"""
     result = run_command(cmd, host_alias)
@@ -237,6 +316,8 @@ def diff_agent(
     stat: bool,
     name_only: bool,
     file_path: str | None,
+    max_chars: int,
+    full: bool,
     host_alias: str | None,
     json_output: bool,
 ) -> None:
@@ -270,14 +351,32 @@ if not cwd:
 
 args = ["git", "-C", cwd] + {diff_args!r}
 result = subprocess.run(args, capture_output=True, text=True)
+stdout = result.stdout
+stderr = result.stderr
+truncated = False
+max_chars = {max_chars}
+if not {full!r} and max_chars > 0:
+    if len(stdout) > max_chars:
+        stdout = (
+            stdout[:max_chars]
+            + "\\n... truncated; use --full for complete diff ...\\n"
+        )
+        truncated = True
+    if len(stderr) > max_chars:
+        stderr = (
+            stderr[:max_chars]
+            + "\\n... truncated; use --full for complete stderr ...\\n"
+        )
+        truncated = True
 payload = {{
     "task": {task!r},
     "cwd": cwd,
     "command": " ".join(args),
     "returncode": result.returncode,
-    "stdout": result.stdout,
-    "stderr": result.stderr,
+    "stdout": stdout,
+    "stderr": stderr,
     "has_changes": bool(result.stdout),
+    "truncated": truncated,
 }}
 print(json.dumps(payload, ensure_ascii=False))
 raise SystemExit(result.returncode)
@@ -458,3 +557,6 @@ def _print_status(payload: dict[str, Any]) -> None:
         click.echo(git_status, nl=False)
     elif payload.get("cwd"):
         click.echo("git status: clean")
+    if payload.get("tail_preview"):
+        click.echo("tail preview:")
+        click.echo(payload["tail_preview"], nl=False)

@@ -5,6 +5,7 @@ from click import ClickException
 
 from dev_connect.commands.agent import (
     _agent_command,
+    _format_output,
     _session_name,
     _state_dir,
     _validate_task,
@@ -48,3 +49,9 @@ def test_agent_command_allows_explicit_command():
 def test_validate_task_accepts_list_safe_name():
     """list/stop/diff 复用同一 task 命名规则."""
     assert _validate_task("agent.demo_2") == "agent.demo_2"
+
+
+def test_format_output_compacts_blank_lines_and_limits_chars():
+    """tail 输出支持机械去空行和字符截断."""
+    output = _format_output("a\n\nb\n\nc\n", 4, True)
+    assert output == "b\nc\n"

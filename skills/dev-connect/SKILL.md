@@ -151,7 +151,7 @@ dev tail FILE [--host HOST] [--lines N]
 ### 启动会话
 
 ```bash
-dev agent start TASK --cwd REMOTE_DIR [--agent AGENT] [--host HOST]
+dev agent start TASK --cwd REMOTE_DIR [--agent AGENT] [--message MSG] [--prompt-file FILE] [--wait N] [--host HOST]
 ```
 
 - 底层使用远程 `tmux` 启动交互式 agent
@@ -163,13 +163,15 @@ dev agent start TASK --cwd REMOTE_DIR [--agent AGENT] [--host HOST]
 ### 发送指令
 
 ```bash
-dev agent send TASK MESSAGE [--host HOST]
+dev agent send TASK [MESSAGE] [--wait N] [--lines N] [--chars N] [--compact] [--host HOST]
 ```
+
+不传 `MESSAGE` 时从 stdin 读取；stdin 为空时只发送 Enter。
 
 ### 读取输出
 
 ```bash
-dev agent tail TASK [--lines N] [--host HOST]
+dev agent tail TASK [--lines N] [--chars N] [--compact] [--host HOST]
 ```
 
 ### 打断会话
@@ -181,16 +183,16 @@ dev agent interrupt TASK [--host HOST]
 ### 查看状态
 
 ```bash
-dev agent status TASK [--host HOST]
+dev agent status TASK [--preview-lines N] [--preview-chars N] [--host HOST]
 ```
 
 ### 查看 diff
 
 ```bash
-dev agent diff TASK [--stat] [--name-only] [--file PATH] [--host HOST]
+dev agent diff TASK [--stat] [--name-only] [--file PATH] [--max-chars N] [--full] [--host HOST]
 ```
 
-基于状态文件中的 `cwd` 执行远程 `git diff`。
+基于状态文件中的 `cwd` 执行远程 `git diff`，默认限制输出字符数。
 
 ### 列出会话
 
