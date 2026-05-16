@@ -148,6 +148,9 @@ dev tail FILE [--host HOST] [--lines N]
 
 ## 远程 agent 会话
 
+本地 Codex App 作为 supervisor 控制远程 Claude Code / Codex 时，先阅读
+`references/agent-supervisor-workflow.md`。
+
 ### 启动会话
 
 ```bash
