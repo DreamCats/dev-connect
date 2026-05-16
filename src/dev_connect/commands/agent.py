@@ -17,7 +17,7 @@ STATE_ROOT = "~/.dev-connect/agents"
 TASK_RE = re.compile(r"^[A-Za-z0-9_.-]+$")
 
 AGENT_COMMANDS = {
-    "claude": "cc",
+    "claude": "if whence -w cc >/dev/null 2>&1; then cc; else claude; fi",
     "cc": "cc",
     "codex": "codex",
 }

@@ -155,7 +155,8 @@ dev agent start TASK --cwd REMOTE_DIR [--agent AGENT] [--host HOST]
 ```
 
 - 底层使用远程 `tmux` 启动交互式 agent
-- `--agent claude` 会映射为远程 `cc`
+- `--agent claude` 会优先启动远程 `cc`，不存在时降级为 `claude`
+- `--agent cc` 会直接启动远程 `cc`，适合复用带权限参数的 Claude alias
 - `--agent codex` 会启动远程 `codex`
 - 状态记录在远程 `~/.dev-connect/agents/<TASK>/session.json`
 

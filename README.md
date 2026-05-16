@@ -236,7 +236,8 @@ dev agent status TASK [--host HOST] [--json]
 - `TASK`：本次远程会话名称，只能包含字母、数字、下划线、点和短横线
 - `--cwd`：远程 agent 启动目录
 - `--agent`：agent 类型或启动命令，默认 `claude`
-- `claude` 会映射为远程 `cc`，用于复用远程 `.zshrc` 中的 Claude alias
+- `claude` 会优先启动远程 `cc`，不存在时降级为 `claude`
+- `cc` 会直接启动远程 `cc`，适合复用带权限参数的 Claude alias
 - `codex` 会直接启动远程 `codex`
 - 状态文件保存在远程 `~/.dev-connect/agents/<TASK>/session.json`
 - `--host, -H`：主机别名，不传时使用默认主机

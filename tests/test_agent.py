@@ -30,7 +30,9 @@ def test_session_paths_are_deterministic():
 
 def test_agent_command_uses_known_shortcuts():
     """常用 agent 名称映射为远程启动命令."""
-    assert _agent_command("claude") == "cc"
+    assert _agent_command("claude") == (
+        "if whence -w cc >/dev/null 2>&1; then cc; else claude; fi"
+    )
     assert _agent_command("cc") == "cc"
     assert _agent_command("codex") == "codex"
 
