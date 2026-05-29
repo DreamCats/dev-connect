@@ -18,7 +18,7 @@ var allCommands = map[string]bool{
 	"patch": true, "repo-status": true, "git-snapshot": true, "repo-diff": true, "tree": true,
 	"grep": true, "slice": true, "find": true, "head": true, "tail": true, "write": true,
 	"diff": true, "repo": true, "verify": true, "edit": true, "config": true, "stats": true,
-	"version": true,
+	"cg": true, "codegraph": true, "version": true,
 }
 
 func Run(args []string) error {
@@ -182,6 +182,8 @@ func runCommand(cfg appConfig, cmd string, args []string) (int, error) {
 		return cmdConfig(args, out)
 	case "stats":
 		return commands.Stats(out)
+	case "cg", "codegraph":
+		return cmdCodegraph(args, out)
 	case "version":
 		fmt.Printf("dev %s\n", model.Version)
 		return 0, nil
@@ -845,6 +847,9 @@ Options:
   dev git-snapshot --cwd ~/repo
   dev repo resolve ttec/project
   dev verify go --cwd ~/repo --changed --timeout 300
+  dev cg install
+  dev --json cg context --cwd ~/repo "fix login bug" --summary
+  dev cg overview --repo ttec/project
 
 写入/编辑：
   dev write ~/test.txt -c "hello"
@@ -883,6 +888,7 @@ Commands:
   git-snapshot  返回只读 review 快照
   repo resolve  解析 ORG/REPO 到远程路径
   verify go     只验证变更涉及的 Go package
+  cg            远程 codegraph 索引和知识图谱查询
   config        管理主机配置
   stats         显示命令使用统计
   version       显示版本
@@ -984,6 +990,34 @@ Options:
 Examples:
   dev verify go --cwd ~/repo --changed
   dev --json verify go --cwd ~/repo --changed --also ./internal/service`)
+}
+
+func printCodegraphHelp() {
+	fmt.Println(`远程 codegraph 代理，在开发机上索引远程仓库并查询代码知识图谱。
+
+Usage:
+  dev cg install [OPTIONS]
+  dev cg COMMAND [ARGS]... --cwd REPO [OPTIONS]
+  dev cg COMMAND [ARGS]... --repo ORG/REPO [OPTIONS]
+
+Options:
+      --host, -H HOST          主机别名
+      --cwd REPO               远程仓库目录，会转成 codegraph --path
+      --repo ORG/REPO          先用 dev repo resolve 解析远程仓库目录
+      --timeout, -t SECONDS    远端命令超时时间，默认 300 秒
+
+Install Options:
+      --remote PATH            远端安装路径，默认 ~/.local/bin/codegraph
+      --source PATH            本地 codegraph 二进制路径；不指定时自动查找/安装
+      --module MODULE@VERSION  go install 模块，默认 github.com/DreamCats/codegraph-cli/cmd/codegraph@latest
+
+Examples:
+  dev cg install
+  dev cg init --cwd ~/repo --index
+  dev cg index --cwd ~/repo --quiet
+  dev --json cg overview --cwd ~/repo
+  dev --json cg context --cwd ~/repo "fix login bug" --summary
+  dev --json cg callers --repo ttec/project SomeFunc`)
 }
 
 func printConfigHelp() {

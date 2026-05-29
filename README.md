@@ -83,6 +83,22 @@ dev repo resolve ttec/project
 dev verify go --cwd ~/repo --changed
 ```
 
+Remote codegraph:
+
+```bash
+dev cg install
+dev cg init --cwd ~/repo --index
+dev cg index --cwd ~/repo --quiet
+dev --json cg overview --cwd ~/repo
+dev --json cg context --cwd ~/repo "fix login bug" --summary
+dev --json cg callers --repo ttec/project SomeFunc
+```
+
+`dev cg install` installs `codegraph` on the remote host. It first detects the
+remote OS/arch. If the local `codegraph` binary is compatible, it uploads that
+binary; otherwise it runs local `go install` for the remote target and uploads
+the generated binary to `~/.local/bin/codegraph`.
+
 ```bash
 dev write ~/test.txt -c "hello"
 echo "hello" | dev write ~/test.txt

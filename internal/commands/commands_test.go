@@ -148,6 +148,27 @@ func TestBuildEditCmdUsesStructuredScript(t *testing.T) {
 	}
 }
 
+func TestCodegraphInjectsPathAfterSubcommand(t *testing.T) {
+	got := injectCodegraphPath([]string{"--json", "context", "fix login bug", "--summary"}, "~/repo")
+	want := []string{"--json", "context", "fix login bug", "--summary", "--path", "~/repo"}
+	if strings.Join(got, "\x00") != strings.Join(want, "\x00") {
+		t.Fatalf("got %#v want %#v", got, want)
+	}
+}
+
+func TestCodegraphDoesNotInjectPathForListOrExplicitTarget(t *testing.T) {
+	for _, args := range [][]string{
+		{"list"},
+		{"--target", "demo", "overview"},
+		{"overview", "--path", "~/repo"},
+	} {
+		got := injectCodegraphPath(args, "~/other")
+		if strings.Join(got, "\x00") != strings.Join(args, "\x00") {
+			t.Fatalf("unexpected injection for %#v: %#v", args, got)
+		}
+	}
+}
+
 func containsString(s, sub string) bool {
 	return len(sub) == 0 || (len(s) >= len(sub) && strings.Contains(s, sub))
 }

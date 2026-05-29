@@ -76,6 +76,25 @@ dev verify go --cwd REPO --changed [--also PKG] [--timeout N] [--host HOST]
 
 `verify go --changed` 只验证变更涉及的 Go package，不默认跑 `go test ./...`。
 
+## 远程代码知识图谱
+
+当公司仓库只在远程开发机上时，用 `dev cg` 在远端安装并执行 `codegraph`：
+
+```bash
+dev cg install [--host HOST]
+dev cg init --cwd REPO --index [--host HOST]
+dev cg index --cwd REPO --quiet [--host HOST]
+dev --json cg overview --cwd REPO [--host HOST]
+dev --json cg context --cwd REPO "task description" --summary [--host HOST]
+dev --json cg callers --cwd REPO SymbolName [--host HOST]
+dev --json cg affected --repo ORG/REPO FILE [--host HOST]
+```
+
+- `--cwd REPO` 会转成远端 `codegraph --path REPO`。
+- `--repo ORG/REPO` 会先复用 `dev repo resolve` 找到远程仓库目录。
+- 需要 Agent 消费时使用全局 `dev --json cg ...`，不要把 `--json` 放到远端命令末尾。
+- 如果远端没有 `codegraph`，先运行 `dev cg install`；默认安装到 `~/.local/bin/codegraph`。
+
 ## Patch
 
 ```bash
