@@ -176,23 +176,55 @@ func codegraphBinaryForTarget(sourcePath, module, goos, goarch string) (string, 
 		return "", nil, err
 	}
 	cleanup := func() { _ = os.RemoveAll(dir) }
-	cmd := exec.Command("go", "install", module)
-	cmd.Env = append(os.Environ(),
-		"GOBIN="+dir,
-		"GOOS="+goos,
-		"GOARCH="+goarch,
-	)
-	out, err := cmd.CombinedOutput()
-	if err != nil {
-		cleanup()
-		return "", nil, fmt.Errorf("go install codegraph failed: %w\n%s", err, string(out))
-	}
 	path := filepath.Join(dir, "codegraph")
+	if err := buildModuleCommand(dir, module, path, goos, goarch); err != nil {
+		cleanup()
+		return "", nil, err
+	}
 	if _, err := os.Stat(path); err != nil {
 		cleanup()
 		return "", nil, err
 	}
 	return path, cleanup, nil
+}
+
+func buildModuleCommand(workDir, moduleSpec, outputPath, goos, goarch string) error {
+	pkg, version := splitModuleSpec(moduleSpec)
+	root := moduleRootForPackage(pkg)
+	rootSpec := root
+	if version != "" {
+		rootSpec += "@" + version
+	}
+	steps := [][]string{
+		{"go", "mod", "init", "dev-codegraph-install"},
+		{"go", "get", rootSpec},
+		{"go", "get", pkg},
+		{"go", "build", "-o", outputPath, pkg},
+	}
+	for _, step := range steps {
+		cmd := exec.Command(step[0], step[1:]...)
+		cmd.Dir = workDir
+		cmd.Env = append(os.Environ(), "GOOS="+goos, "GOARCH="+goarch)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			return fmt.Errorf("%s failed: %w\n%s", strings.Join(step, " "), err, string(out))
+		}
+	}
+	return nil
+}
+
+func splitModuleSpec(spec string) (string, string) {
+	if pkg, version, ok := strings.Cut(spec, "@"); ok {
+		return pkg, version
+	}
+	return spec, "latest"
+}
+
+func moduleRootForPackage(pkg string) string {
+	if idx := strings.Index(pkg, "/cmd/"); idx >= 0 {
+		return pkg[:idx]
+	}
+	return pkg
 }
 
 func findLocalCodegraphBinary() string {
