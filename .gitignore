@@ -1,0 +1,6 @@
+dev
+dist/
+build/
+*.test
+coverage.out
+.DS_Store
