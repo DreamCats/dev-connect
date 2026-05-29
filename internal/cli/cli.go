@@ -596,6 +596,10 @@ func cmdDiff(args []string, out commands.Output) (int, error) {
 }
 
 func cmdRepo(args []string, out commands.Output) (int, error) {
+	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
+		printRepoHelp()
+		return 0, nil
+	}
 	if len(args) == 0 {
 		return 1, fmt.Errorf("repo requires subcommand")
 	}
@@ -619,6 +623,10 @@ func cmdRepo(args []string, out commands.Output) (int, error) {
 }
 
 func cmdVerify(args []string, out commands.Output) (int, error) {
+	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
+		printVerifyHelp()
+		return 0, nil
+	}
 	if len(args) == 0 || args[0] != "go" {
 		return 1, fmt.Errorf("verify requires go")
 	}
@@ -643,8 +651,9 @@ func cmdVerify(args []string, out commands.Output) (int, error) {
 }
 
 func cmdEdit(args []string, out commands.Output) (int, error) {
-	if len(args) == 0 {
-		return 1, fmt.Errorf("edit requires subcommand")
+	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
+		printEditHelp()
+		return 0, nil
 	}
 	switch args[0] {
 	case "replace":
@@ -720,8 +729,9 @@ func cmdEdit(args []string, out commands.Output) (int, error) {
 }
 
 func cmdConfig(args []string, out commands.Output) (int, error) {
-	if len(args) == 0 {
-		return 1, fmt.Errorf("config requires subcommand")
+	if len(args) == 0 || args[0] == "--help" || args[0] == "-h" {
+		printConfigHelp()
+		return 0, nil
 	}
 	switch args[0] {
 	case "show":
@@ -798,19 +808,90 @@ func parseCwdHost(name string, args []string) (string, string, error) {
 }
 
 func printTopHelp() {
-	fmt.Println(`Usage: dev [OPTIONS] COMMAND [ARGS]...
+	fmt.Println(`远程开发机文件交互 CLI，对 Agent 友好。
+
+Usage:
+  dev [OPTIONS] COMMAND [ARGS]...
 
 Options:
-      --json      JSON 格式输出
-      --verbose   显示完整错误栈
-  -h, --help      Show help
-      --version   Show version
+      --json       JSON 格式输出，便于 Agent 解析
+      --verbose    显示完整错误栈
+  -h, --help       显示帮助
+      --version    显示版本
+
+基本用法：
+  dev ls ~/projects
+  dev cat ~/.bashrc
+  dev cat --cwd ~/repo go.mod cmd/dev/main.go
+  dev slice internal/cli/cli.go --cwd ~/repo --range 120:180
+  dev head ~/logs/app.log -n 40
+  dev tail ~/logs/app.log -n 100
+
+搜索：
+  dev grep "func main" ~/repo --include "*.go"
+  dev grep "TODO" ~/repo --context 2 --max-matches 20 --group
+  dev find "*.go" ~/repo --type f
+  dev tree ~/repo --depth 2
+
+执行：
+  dev exec "uname -a"
+  dev exec --cwd ~/repo "go test ./..." --timeout 300
+  dev exec sgdev --cwd ~/repo -- go test ./...
+  dev exec-watch "go test ./..." --cwd ~/repo --interval 10 --timeout 300
+
+仓库：
+  dev repo-status --cwd ~/repo
+  dev repo-diff --cwd ~/repo --stat
+  dev git-snapshot --cwd ~/repo
+  dev repo resolve ttec/project
+  dev verify go --cwd ~/repo --changed --timeout 300
+
+写入/编辑：
+  dev write ~/test.txt -c "hello"
+  echo "content" | dev write ~/test.txt
+  dev edit replace ~/file.txt "old" "new" --all
+  dev edit insert ~/file.txt 10 "new line" --after
+  dev edit delete ~/file.txt 10 20
+  dev edit line ~/file.txt 5 "replacement"
+  dev patch --cwd ~/repo < changes.patch
+
+配置：
+  dev config show
+  dev config add sgdev <HOSTNAME_OR_IP> --user <USER> --default
+  dev config set-shell sgdev zsh
+  dev config set-exec-timeout sgdev 120
 
 Commands:
-  ls cat push pull exec exec-watch patch
-  repo-status git-snapshot repo-diff repo resolve
-  tree grep slice find head tail write diff
-  verify go edit config stats version`)
+  ls            列远程目录
+  cat           读取一个或多个远程文件
+  slice         精准读取远程文件片段
+  grep          搜索远程代码内容，优先 rg，降级 grep
+  find          按名称搜索远程文件
+  tree          显示远程目录树
+  head          查看文件开头
+  tail          查看文件末尾
+  push          上传文件到远程主机
+  pull          从远程主机下载文件
+  exec          执行远程命令，支持 host-first 和 --watch
+  exec-watch    低频观察远程长命令，JSON 模式输出事件流
+  write         写入或追加远程文件
+  edit          精确编辑远程文件
+  diff          比较远程文件，或远程文件与本地文件
+  patch         应用 Codex 结构化 patch
+  repo-status   返回远程 Git 仓库状态快照
+  repo-diff     输出远程 Git diff
+  git-snapshot  返回只读 review 快照
+  repo resolve  解析 ORG/REPO 到远程路径
+  verify go     只验证变更涉及的 Go package
+  config        管理主机配置
+  stats         显示命令使用统计
+  version       显示版本
+
+Agent 提示：
+  需要解析结果时优先加 --json。
+  大文件先用 slice/head/tail，避免 cat 全文。
+  长命令使用 exec --watch 或 exec-watch。
+  exec 后面的 --json 可能是远端命令参数，因此不会被提升为全局 JSON。`)
 }
 
 func printExecHelp() {
@@ -838,6 +919,105 @@ Options:
       --summary-chars N        结束摘要最大字符数
       --shell SHELL            none|zsh|zsh-login|bash|bash-login
       --help                   Show help`)
+}
+
+func printEditHelp() {
+	fmt.Println(`精确编辑远程文件。
+
+Usage:
+  dev edit COMMAND [ARGS]...
+
+Commands:
+  replace PATH OLD NEW [--all] [--host HOST]
+      替换文件内容。默认只替换首次匹配，--all 替换全部。
+
+  insert PATH LINE CONTENT [--after] [--host HOST]
+      在指定行前插入内容；加 --after 表示在该行后插入。
+
+  delete PATH START [END] [--host HOST]
+      删除指定行或行范围，行号从 1 开始。
+
+  line PATH NUM CONTENT [--host HOST]
+      修改指定行内容。
+
+Examples:
+  dev edit replace ~/config.py "old" "new"
+  dev edit replace ~/config.py "foo" "bar" --all
+  dev edit insert ~/test.py 10 "new line" --after
+  dev edit delete ~/test.py 10 20
+  dev edit line ~/test.py 5 "replacement"`)
+}
+
+func printRepoHelp() {
+	fmt.Println(`远程仓库辅助命令。
+
+Usage:
+  dev repo COMMAND [ARGS]...
+
+Commands:
+  resolve ORG/REPO [--host HOST]
+      把 code.byted.org 风格仓库名解析成远程绝对路径。
+
+Examples:
+  dev repo resolve ttec/project
+  dev --json repo resolve ttec/project --host sgdev`)
+}
+
+func printVerifyHelp() {
+	fmt.Println(`按语言/仓库类型执行范围化验证。
+
+Usage:
+  dev verify go --cwd REPO --changed [OPTIONS]
+
+Commands:
+  go
+      根据 staged、unstaged、untracked 的 .go 文件映射 package，
+      只运行 go test <touched packages>。
+
+Options:
+      --cwd REPO             远程 Go 仓库目录
+      --changed              只验证变更涉及的 package，目前必填
+      --also PKG             追加固定 package，可重复
+      --timeout, -t N        超时时间，默认 300 秒
+      --host, -H HOST        主机别名
+
+Examples:
+  dev verify go --cwd ~/repo --changed
+  dev --json verify go --cwd ~/repo --changed --also ./internal/service`)
+}
+
+func printConfigHelp() {
+	fmt.Println(`配置管理。配置文件位于 ~/.config/dev-connect/config.yaml。
+
+Usage:
+  dev config COMMAND [ARGS]...
+
+Commands:
+  show
+      查看当前配置。
+
+  add ALIAS HOSTNAME [--user USER] [--shell SHELL] [--exec-timeout N] [--repo-root ROOT] [--default]
+      添加或覆盖主机配置。
+
+  set-default ALIAS
+      设置默认主机。
+
+  set-shell ALIAS none|zsh|zsh-login|bash|bash-login
+      设置 dev exec 默认远端 shell。
+
+  set-exec-timeout ALIAS N
+      设置 dev exec 默认超时；N <= 0 表示清除。
+
+  add-repo-root ALIAS ROOT
+      为 repo resolve 追加远端代码根目录。
+
+  clear-repo-roots ALIAS
+      清空主机 repo roots。
+
+Examples:
+  dev config add sgdev <HOSTNAME_OR_IP> --user <USER> --default
+  dev config add-repo-root sgdev /path/to/code.byted.org
+  dev --json config show`)
 }
 
 func newFlagSet(name string) *flag.FlagSet {
