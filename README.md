@@ -10,7 +10,13 @@ same config path and command surface as the Python implementation:
 ## Install
 
 ```bash
-git clone <repo-url>
+go install github.com/DreamCats/dev-connect/cmd/dev@latest
+```
+
+From source:
+
+```bash
+git clone git@github.com:DreamCats/dev-connect.git
 cd dev-connect
 ./install.sh
 ```
@@ -31,8 +37,8 @@ go install ./cmd/dev
 ## Configuration
 
 ```bash
-dev config add sgdev 10.251.233.15 --default
-dev config add sgdev 10.251.233.15 --repo-root /data00/home/maifeng/go/src/code.byted.org
+dev config add sgdev <HOSTNAME_OR_IP> --default
+dev config add sgdev <HOSTNAME_OR_IP> --repo-root /path/to/code.byted.org
 dev config show
 dev --json config show
 ```
@@ -43,8 +49,8 @@ Config file:
 default_host: sgdev
 hosts:
   sgdev:
-    hostname: 10.251.233.15
-    user: maifeng
+    hostname: <HOSTNAME_OR_IP>
+    user: <USER>
     shell: null
     exec_timeout: null
     repo_roots: []
@@ -133,4 +139,3 @@ go test ./...
 go build ./...
 gofmt -w .
 ```
-

@@ -22,5 +22,4 @@ echo "安装完成。"
 echo "使用方法："
 echo "  dev --help"
 echo "  dev config show"
-echo "  dev config add sgdev 10.251.233.15 --default"
-
+echo "  dev config add sgdev <HOSTNAME_OR_IP> --default"
